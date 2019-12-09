@@ -151,6 +151,8 @@ def sample_sequence(model, length, context, num_samples=1, temperature=1, top_k=
             for o in next_token.tolist():
                 text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
                 print(text, end="", flush=True)
+                if '.' in text:
+                    print()
             generated = torch.cat((generated, next_token), dim=1)
     return generated
 
