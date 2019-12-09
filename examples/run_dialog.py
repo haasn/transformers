@@ -170,10 +170,11 @@ def sample_sequence(model, context, num_samples=1, temperature=1, top_k=0, top_p
                 prev_generated = generated
                 eos = False
 
-                next_input = tokenizer.encode(' ' + raw_text, add_special_tokens=False)
-                next_input = torch.tensor(next_input, dtype=torch.long, device=device)
-                next_input = next_input.unsqueeze(0).repeat(num_samples, 1)
-                generated = torch.cat((generated, next_input), dim=1)
+                if raw_text != '':
+                    next_input = tokenizer.encode(' ' + raw_text, add_special_tokens=False)
+                    next_input = torch.tensor(next_input, dtype=torch.long, device=device)
+                    next_input = next_input.unsqueeze(0).repeat(num_samples, 1)
+                    generated = torch.cat((generated, next_input), dim=1)
 
 
 def main():
