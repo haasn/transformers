@@ -108,12 +108,12 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
 
 
 def sample_sequence(model, length, context, num_samples=1, temperature=1, top_k=0, top_p=0.0, repetition_penalty=1.0,
-                    is_xlnet=False, is_xlm_mlm=False, xlm_mask_token=None, xlm_lang=None, device='cpu'):
+                    is_xlnet=False, is_xlm_mlm=False, xlm_mask_token=None, xlm_lang=None, device='cpu', tokenizer=None):
     context = torch.tensor(context, dtype=torch.long, device=device)
     context = context.unsqueeze(0).repeat(num_samples, 1)
     generated = context
     with torch.no_grad():
-        for _ in trange(length):
+        for _ in range(length):
 
             inputs = {'input_ids': generated}
             if is_xlnet: 
@@ -148,6 +148,9 @@ def sample_sequence(model, length, context, num_samples=1, temperature=1, top_k=
                 next_token = torch.argmax(filtered_logits, dim=-1).unsqueeze(-1)
             else:
                 next_token = torch.multinomial(F.softmax(filtered_logits, dim=-1), num_samples=1)
+            for o in next_token.tolist():
+                text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
+                print(text, end="", flush=True)
             generated = torch.cat((generated, next_token), dim=1)
     return generated
 
@@ -221,7 +224,13 @@ def main():
         else:
             xlm_mask_token = None
 
-        raw_text = args.prompt if args.prompt else input("Model prompt >>> ")
+        if args.prompt:
+            raw_text = args.prompt
+            print('Model prompt:')
+            print(raw_text)
+        else:
+            raw_text = input("Model prompt >>> ")
+
         if args.model_type in ["transfo-xl", "xlnet"]:
             # Models with memory likes to have a long prompt for short inputs.
             raw_text = (args.padding_text if args.padding_text else PADDING_TEXT) + raw_text
@@ -229,6 +238,8 @@ def main():
         if args.model_type == "ctrl":
             if not any(context_tokens[0] == x for x in tokenizer.control_codes.values()):
                 logger.info("WARNING! You are not starting your generation from a control code so you won't get good results")
+
+        print('Generated text:')
         out = sample_sequence(
             model=model,
             context=context_tokens,
@@ -243,13 +254,8 @@ def main():
             xlm_mask_token=xlm_mask_token,
             xlm_lang=xlm_lang,
             device=args.device,
+            tokenizer=tokenizer,
         )
-        out = out[:, len(context_tokens):].tolist()
-        for o in out:
-            text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
-            text = text[: text.find(args.stop_token) if args.stop_token else None]
-
-            print(text)
 
         if args.prompt:
             break
