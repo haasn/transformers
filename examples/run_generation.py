@@ -37,6 +37,9 @@ logger = logging.getLogger(__name__)
 
 MAX_LENGTH = int(10000)  # Hardcoded max length to avoid infinite loop
 
+MAX_PAST = 1023     # Hardcoded context limit for GPT2
+BUFFER_SIZE = 200   # How many words to chop off the front of the context
+
 ALL_MODELS = GPT2Config.pretrained_config_archive_map.keys()
 
 MODEL_CLASSES = {
@@ -100,6 +103,7 @@ def sample_sequence(model, length, context, num_samples=1, temperature=1, top_k=
                     device='cpu', tokenizer=None):
     context = torch.tensor(context, dtype=torch.long, device=device)
     context = context.unsqueeze(0).repeat(num_samples, 1)
+    generated = context.clone().detach()
     past = None
 
     with torch.no_grad():
@@ -115,6 +119,13 @@ def sample_sequence(model, length, context, num_samples=1, temperature=1, top_k=
                 next_token = torch.multinomial(F.softmax(filtered_logits, dim=-1), num_samples=1)
 
             context = next_token
+            generated = torch.cat((generated, next_token), dim=1)
+
+            if past[0].size()[3] > MAX_PAST:
+                past = None
+                context_len = MAX_PAST - BUFFER_SIZE
+                context_start = generated.size()[1] - context_len
+                context = torch.narrow(generated, 1, context_start, context_len)
 
             for o in next_token.tolist():
                 text = tokenizer.decode(o, clean_up_tokenization_spaces=True)
