@@ -35,8 +35,6 @@ logging.basicConfig(format = '%(asctime)s - %(levelname)s - %(name)s -   %(messa
                     level = logging.INFO)
 logger = logging.getLogger(__name__)
 
-MAX_LENGTH = int(10000)  # Hardcoded max length to avoid infinite loop
-
 MAX_PAST = 1023     # Hardcoded context limit for GPT2
 BUFFER_SIZE = 200   # How many words to chop off the front of the context
 
@@ -99,7 +97,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
     return logits
 
 
-def sample_sequence(model, length, context, num_samples=1, temperature=1, top_k=0, top_p=0.0,
+def sample_sequence(model, context, num_samples=1, temperature=1, top_k=0, top_p=0.0,
                     device='cpu', tokenizer=None):
     context = torch.tensor(context, dtype=torch.long, device=device)
     context = context.unsqueeze(0).repeat(num_samples, 1)
@@ -107,7 +105,7 @@ def sample_sequence(model, length, context, num_samples=1, temperature=1, top_k=
     past = None
 
     with torch.no_grad():
-        for _ in range(length):
+        while True:
 
             output, past = model(context, past=past)
             next_token_logits = output[:, -1, :] / (temperature if temperature > 0 else 1.)
@@ -142,7 +140,6 @@ def main():
                         help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(ALL_MODELS))
     parser.add_argument("--prompt", type=str, default="")
     parser.add_argument("--padding_text", type=str, default="")
-    parser.add_argument("--length", type=int, default=20)
     parser.add_argument("--temperature", type=float, default=1.0,
                         help="temperature of 0 implies greedy sampling")
     parser.add_argument("--top_k", type=int, default=0)
@@ -167,13 +164,6 @@ def main():
     model.to(args.device)
     model.eval()
 
-    if args.length < 0 and model.config.max_position_embeddings > 0:
-        args.length = model.config.max_position_embeddings
-    elif 0 < model.config.max_position_embeddings < args.length:
-        args.length = model.config.max_position_embeddings  # No generation bigger than model size 
-    elif args.length < 0:
-        args.length = MAX_LENGTH  # avoid infinite loop
-
     logger.info(args)
     logger.info('Seed: ' + str(args.seed))
 
@@ -192,7 +182,6 @@ def main():
         sample_sequence(
             model=model,
             context=context_tokens,
-            length=args.length,
             temperature=args.temperature,
             top_k=args.top_k,
             top_p=args.top_p,
