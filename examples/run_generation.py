@@ -179,15 +179,18 @@ def main():
         context_tokens = tokenizer.encode(raw_text, add_special_tokens=False)
 
         print('Generated text:')
-        sample_sequence(
-            model=model,
-            context=context_tokens,
-            temperature=args.temperature,
-            top_k=args.top_k,
-            top_p=args.top_p,
-            device=args.device,
-            tokenizer=tokenizer,
-        )
+        try:
+            sample_sequence(
+                model=model,
+                context=context_tokens,
+                temperature=args.temperature,
+                top_k=args.top_k,
+                top_p=args.top_p,
+                device=args.device,
+                tokenizer=tokenizer,
+            )
+        except KeyboardInterrupt:
+            print("\nInterrupted!\n")
 
         if args.prompt:
             break
