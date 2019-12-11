@@ -25,6 +25,7 @@ from tqdm import trange
 import torch
 import torch.nn.functional as F
 import numpy as np
+from random import randint
 
 from transformers import GPT2Config
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
@@ -38,17 +39,19 @@ logger = logging.getLogger(__name__)
 MAX_PAST = 1023     # Hardcoded context limit for GPT2
 BUFFER_SIZE = 200   # How many words to chop off the front of the context
 
+MAX_SEED = 65536
+
 ALL_MODELS = GPT2Config.pretrained_config_archive_map.keys()
 
 MODEL_CLASSES = {
     'gpt2': (GPT2LMHeadModel, GPT2Tokenizer),
 }
 
-def set_seed(args):
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
+def set_seed(args, seed):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
     if args.n_gpu > 0:
-        torch.cuda.manual_seed_all(args.seed)
+        torch.cuda.manual_seed_all(seed)
 
 
 def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')):
@@ -130,14 +133,15 @@ def main():
     parser.add_argument("--top_p", type=float, default=0.9)
     parser.add_argument("--no_cuda", action='store_true',
                         help="Avoid using CUDA when available")
-    parser.add_argument('--seed', type=int, default=42,
+    parser.add_argument('--seed', type=int, default=None,
                         help="random seed for initialization")
     args = parser.parse_args()
 
     args.device = torch.device("cuda" if torch.cuda.is_available() and not args.no_cuda else "cpu")
     args.n_gpu = torch.cuda.device_count()
 
-    set_seed(args)
+    if args.seed:
+        set_seed(args, args.seed)
 
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
@@ -147,9 +151,13 @@ def main():
     model.eval()
 
     logger.info(args)
-    logger.info('Seed: ' + str(args.seed))
 
     while True:
+
+        if args.seed is None:
+            new_seed = randint(0, MAX_SEED)
+            logger.info('New seed: ' + str(new_seed))
+            set_seed(args, new_seed)
 
         if args.prompt:
             raw_text = args.prompt
