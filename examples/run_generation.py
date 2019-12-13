@@ -86,7 +86,7 @@ def top_k_top_p_filtering(logits, top_k=0, top_p=0.0, filter_value=-float('Inf')
 
 
 def sample_sequence(model, context, num_samples=1, temperature=1, top_k=0, top_p=0.0,
-                    device='cpu', tokenizer=None):
+                    repetition_penalty=1.0, device='cpu', tokenizer=None):
     context = torch.tensor(context, dtype=torch.long, device=device)
     context = context.unsqueeze(0).repeat(num_samples, 1)
     generated = context.clone().detach()
@@ -97,6 +97,11 @@ def sample_sequence(model, context, num_samples=1, temperature=1, top_k=0, top_p
 
             output, past = model(context, past=past)
             next_token_logits = output[:, -1, :] / (temperature if temperature > 0 else 1.)
+
+            # repetition penalty from CTRL (https://arxiv.org/abs/1909.05858)
+            for i in range(num_samples):
+                for _ in set(generated[i].tolist()):
+                    next_token_logits[i, _] /= repetition_penalty
 
             filtered_logits = top_k_top_p_filtering(next_token_logits, top_k=top_k, top_p=top_p)
             if temperature == 0: # greedy sampling:
@@ -129,6 +134,8 @@ def main():
     parser.add_argument("--prompt", type=str, default="")
     parser.add_argument("--temperature", type=float, default=1.0,
                         help="temperature of 0 implies greedy sampling")
+    parser.add_argument("--repetition_penalty", type=float, default=1.0,
+                        help="primarily useful for CTRL model; in that case, use 1.2")
     parser.add_argument("--top_k", type=int, default=0)
     parser.add_argument("--top_p", type=float, default=0.9)
     parser.add_argument("--no_cuda", action='store_true',
