@@ -181,6 +181,7 @@ def main():
                 model=model,
                 context=context_tokens,
                 temperature=args.temperature,
+                repetition_penalty=args.repetition_penalty,
                 top_k=args.top_k,
                 top_p=args.top_p,
                 device=args.device,
